@@ -1,4 +1,10 @@
-# Green Guardian - An IoT Solution for Plant Care
+<h1 align="center">
+  <img src="http://www.green-guardian.org/assets/GreenGuardians.png" alt="Logo" style="height: 100px; width: auto; vertical-align: middle;">
+  <br style="font-size:200%;">
+   <strong>Green Guardian - An IoT Solution for Plant Care</strong>
+  </br>
+</h1>
+
 
 
 ## Motivation
