@@ -51,6 +51,19 @@ Americans invest billions of dollars annually in houseplants, yet it is estimate
   - Firmware for microcontrollers
   - Mobile app or web dashboard for notifications, manual controls and one-time sensing instances
 
+## Responsibilities of Team Members:
+
+- **HW Setup**: Mar, Divya
+- **Embedded SW for Arduino**: Shreyas, William
+- **Research/Algorithm Design**: 
+  - Energy harvesting: William, Shreyas
+  - Networking/Cloud communication: Divya, Mar
+  - Water control system: Shreyas, Divya
+  - User survey: Mar, William
+- **Writing/Report**: Everyone 
+- **Website**: William, Divya
+
+
 ## Project Timeline
 
 - **Week 1**: Project kickoff, initial research, and component ordering.
