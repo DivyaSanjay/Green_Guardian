@@ -34,8 +34,8 @@ Americans invest billions of dollars annually in houseplants, yet it is estimate
 
 ## System Blocks
 
-1. **Sensors**: Humidity, temperature, and light sensors to monitor the environment.
-2. **Energy Harvesting**: A module to convert ambient energy (e.g., solar or thermal) into usable electrical energy.
+1. **Sensors**: Soil moisture, Humidity, temperature, and light sensors to monitor the environment.
+2. **Energy Harvesting**: A module to convert ambient solar energy into usable electrical energy.
 3. **Watering Mechanism**: An automated system to deliver water based on the plant's needs.
 4. **Control System**: A microcontroller or similar device to process sensor inputs and manage the watering mechanism.
 5. **User Interface**: Notifications and an app/dashboard for user interaction.
