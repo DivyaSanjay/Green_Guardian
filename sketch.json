@@ -1,0 +1,9 @@
+{
+  "cpu": {
+    "fqbn": "arduino:renesas_uno:unor4wifi",
+    "name": "Arduino UNO R4 WiFi",
+    "type": "serial"
+  },
+  "secrets": [],
+  "included_libs": []
+}
