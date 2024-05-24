@@ -60,9 +60,10 @@
 #define LUX_DAYLIGHT_THRESHOLD  1.0
 // Pins
 #define BH1750_ADDRESS          0x23
-#define BATTERY_PIN             A1
+#define BATTERY_PIN             A3
 #define DHT_PIN                 A2
-#define MOISTURE_PIN            A0
+#define MOISTURE_PIN_1          A0
+#define MOISTURE_PIN_2          A1
 #define DHT_TYPE                DHT11
 #define WATER_LEVEL_PIN         7
 #define SERVO_PIN               3
@@ -167,15 +168,28 @@ void synchronize_time()
 
 const uint32_t logo[] = {
     0x18c21,
-		0x2d62521,
-		0x8c000000,
+    0x2d62521,
+    0x8c000000,
 };
 
-void light_up_matrix()
+const uint32_t bad_state[] = {
+    0x62655,
+    0x57755556,
+    0x56000000,
+  };
+
+void light_up_matrix(unsigned int normal)
 {
   ArduinoLEDMatrix matrix;
   matrix.begin();
-  matrix.loadFrame(logo);
+  if (normal)
+  {
+    matrix.loadFrame(logo);
+  }
+  else
+  {
+    matrix.loadFrame(bad_state);
+  }
 }
 
 /*******************************************************************************/
@@ -189,7 +203,8 @@ struct {
   float   humidity;     // 4 bytes
   float   lux;          // 4 bytes
   int     water_level;  // 4 bytes
-  float   moisture;     // 4 bytes
+  short int   moisture_1;     // 2 bytes
+  short int   moisture_2;     // 2 bytes
   float   battery;      // 4 bytes
 } sensor_data;
 
@@ -243,18 +258,28 @@ void measure_sensors()
     sensor_data.humidity = dht.readHumidity();
     sensor_data.lux = myBH1750.getLux();
     sensor_data.water_level = digitalRead(WATER_LEVEL_PIN);
-    sensor_data.moisture = analogRead(MOISTURE_PIN);
+    sensor_data.moisture_1 = (short int)analogRead(MOISTURE_PIN_1);
+    sensor_data.moisture_2 = (short int)analogRead(MOISTURE_PIN_2);
+
+    // Display if everything is being read correctly
+    unsigned int normal = 1;
+    normal &= sensor_data.moisture_1 > 0 ? 1 : 0;
+    normal &= sensor_data.moisture_2 > 0 ? 1 : 0;
+    normal &= sensor_data.temperature > 0.0 ? 1 : 0;
+    normal &= sensor_data.humidity > 0.0 ? 1 : 0;
+    normal &= sensor_data.lux > 0.0 ? 1 : 0;
+    light_up_matrix(normal);
 
     char buffer[200];
-    sprintf(buffer, "[%ld, %f, %f, %f, %d, %f, %f]", sensor_data.unix_time, sensor_data.temperature, sensor_data.humidity, sensor_data.lux,
-    sensor_data.water_level, sensor_data.moisture, sensor_data.battery);
+    sprintf(buffer, "[%ld, %f, %f, %f, %d, %d, %d, %f]", sensor_data.unix_time, sensor_data.temperature, sensor_data.humidity, sensor_data.lux,
+    sensor_data.water_level, sensor_data.moisture_1, sensor_data.moisture_2, sensor_data.battery);
     DEBUG_PRINTLN(buffer);
     // delay(10000);
 }
 
 void actuate()
 {
-    if ((sensor_data.moisture < MOISTURE_THRESHOLD) &&
+    if ((sensor_data.moisture_1 < MOISTURE_THRESHOLD) &&
         (sensor_data.lux > LUX_DAYLIGHT_THRESHOLD))
     {
         // TODO Actuate        
