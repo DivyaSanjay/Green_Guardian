@@ -23,8 +23,13 @@
  */
 
 /*******************************************************************************/
+/* WI-FI Connection */
+/*******************************************************************************/
+
+/*******************************************************************************/
 /* Includes */
 /*******************************************************************************/
+
 
 #include "RTC.h"
 #include <NTPClient.h>
@@ -68,8 +73,8 @@
 #define WATER_LEVEL_PIN         7
 #define SERVO_PIN               3
 // Valve constants
-#define VALVE_OPEN_DEGREES      90
-#define VALVE_CLOSED_DEGREES    0
+#define VALVE_OPEN_DEGREES      10
+#define VALVE_CLOSED_DEGREES    100
 #define ACTUATE_DURATION        4
 
 #define DEBUG_PRINT_ENABLED     1
