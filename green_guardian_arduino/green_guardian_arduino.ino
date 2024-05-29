@@ -228,10 +228,10 @@ BH1750_WE myBH1750(BH1750_ADDRESS);
 DHT dht(DHT_PIN, DHT_TYPE);
 boolean valveOpen;
 Servo myServo;
-// short int hot_days = 0;
-// short iny cold_days = 0;
-// short int shade_days = 0;
-// short int light_days = 0;
+short int hot_days = 0;
+short iny cold_days = 0;
+short int shade_days = 0;
+short int light_days = 0;
 
 
 void sense_and_actuate()
@@ -312,6 +312,8 @@ float read_soil_moisture() {
   return (sensor_data.moisture_1 + sensor_data.moisture_2)/2;
 }
 
+// CONTROL SOIL MOISTURE
+
 void control_soil_moisture() {
   soil_moisture = read_soil_moisture();
   cycles = 0;
@@ -337,58 +339,103 @@ void control_soil_moisture() {
   }
 }
 
-void control_temperature() {  //Check that the day is different
-  if (sensor_data.temperature < TEMPERATURE_LOW_IDEAL){
-    if (sensor_data.temperature < TEMPERATURE_LOW_THRESHOLD)
-      DEBUG_PRINTLN("Move the plant to a warmer location. ");
-    else {
-      if (cold_days < MAX_NOT_IDEAL_DAYS)
+bool different_day() {
+   //TODO
+   return true;
+}
+
+// CONTROL TEMPERATURE 
+
+void control_temperature() {
+    bool is_different_day = different_day();
+
+    // Handle low temperature
+    if (sensor_data.temperature < TEMPERATURE_LOW_IDEAL) {
+        handle_low_temperature(is_different_day);
+    } else {
+      // If this keeps happening for a hole day then: //TODO
+        cold_days = 0; // Reset cold days counter
+    }
+
+    // Handle high temperature
+    if (sensor_data.temperature > TEMPERATURE_HIGH_IDEAL) {
+        handle_high_temperature(is_different_day);
+    } else {
+      // If this keeps happening for a hole day then: //TODO
+        hot_days = 0; // Reset hot days counter
+    }
+}
+
+void handle_low_temperature(bool is_different_day) {
+    if (sensor_data.temperature < TEMPERATURE_LOW_THRESHOLD) {
+        DEBUG_PRINTLN("Move the plant to a warmer location.");
+        return;
+    }
+
+    if (cold_days < MAX_NOT_IDEAL_DAYS && is_different_day) {
         cold_days++;
-      else 
-        DEBUG_PRINTLN("Move the plant to a warmer location. ");
+    } else {
+        DEBUG_PRINTLN("Move the plant to a warmer location.");
     }
-  }
-  else
-    cold_days = 0;
-    
-  if (sensor_data.temperature > TEMPERATURE_HIGH_IDEAL){
-    if (sensor_data.temperature > TEMPERATURE_HIGH_THRESHOLD)
-      DEBUG_PRINTLN("Move the plant to a cooler location. ");
-    else {
-      if (hot_days < MAX_NOT_IDEAL_DAYS)
+}
+
+void handle_high_temperature(bool is_different_day) {
+    if (sensor_data.temperature > TEMPERATURE_HIGH_THRESHOLD) {
+        DEBUG_PRINTLN("Move the plant to a cooler location.");
+        return;
+    }
+
+    if (hot_days < MAX_NOT_IDEAL_DAYS && is_different_day) {
         hot_days++;
-      else 
-        DEBUG_PRINTLN("Move the plant to a cooler location. ");
+    } else {
+        DEBUG_PRINTLN("Move the plant to a cooler location.");
     }
-  }
-  else
-    hot_days = 0;
-
 }
 
-void control_light() {  //Check that the day is different
-  if (sensor_data.lux < LUX_LOW_IDEAL){
-    if (sensor_data.lux < LUX_DAYLIGHT_THRESHOLD)
-      DEBUG_PRINTLN("Move the plant to a lighter location. ");
-    else {
-      if (shade_days < MAX_NOT_IDEAL_DAYS)
+// CONTROL LIGHT
+
+void control_light() {
+    bool is_different_day = different_day();
+
+    // Handle low light
+    if (sensor_data.lux < LUX_LOW_IDEAL) {
+        handle_low_light();
+    } else {
+      // If this keeps happening for a hole day then: //TODO
+        shade_days = 0; // Reset shade days counter 
+    }
+
+    // Handle high light
+    if (sensor_data.lux > LUX_HIGH_IDEAL) {
+        handle_high_light(is_different_day);
+    } else {
+      // If this keeps happening for a hole day then: //TODO
+        light_days = 0; // Reset light days counter 
+    }
+}
+
+void handle_low_light() {
+    if (sensor_data.lux < LUX_DAYLIGHT_THRESHOLD) {
+        DEBUG_PRINTLN("Move the plant to a lighter location.");
+        return;
+    }
+
+    if (shade_days < MAX_NOT_IDEAL_DAYS) {
         shade_days++;
-      else 
-        DEBUG_PRINTLN("Move the plant to a lighter location. ");
+    } else {
+        DEBUG_PRINTLN("Move the plant to a lighter location.");
     }
-  }
-  else
-    shade_days = 0;
-    
-  if (sensor_data.lux > LUX_HIGH_IDEAL){
-    if (light_days < MAX_NOT_IDEAL_DAYS)
-      light_days++;
-    else 
-      DEBUG_PRINTLN("Move the plant to a shadier location. ");
-  }
-  else
-    light_days = 0;
 }
+
+void handle_high_light(bool is_different_day) {
+    if (light_days < MAX_NOT_IDEAL_DAYS && is_different_day) {
+        light_days++;
+    } else {
+        DEBUG_PRINTLN("Move the plant to a shadier location.");
+    }
+}
+
+// CONTROL BOTTLE SENSOR
 
 control_bottle_sensor() {
   if (water_level == 0) 
