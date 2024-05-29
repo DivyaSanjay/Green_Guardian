@@ -86,6 +86,9 @@
 #define VALVE_OPEN_DEGREES      10
 #define VALVE_CLOSED_DEGREES    100
 #define ACTUATE_DURATION        4
+// Calibration values for soil moisture sensor (inverse relationship)
+#define VALUEAT0 = 500;
+#define VALUEAT100 = 270;
 
 #define DEBUG_PRINT_ENABLED     1
 #if DEBUG_PRINT_ENABLED
@@ -218,7 +221,7 @@ struct {
   float   humidity;     // 4 bytes
   float   lux;          // 4 bytes
   int     water_level;  // 4 bytes
-  short int   moisture_1;     // 2 bytes  //TODO we have to make moisture be percentage
+  short int   moisture_1;     // 2 bytes  
   short int   moisture_2;     // 2 bytes
   float   battery;      // 4 bytes
 } sensor_data;
@@ -278,8 +281,9 @@ void measure_sensors()
     sensor_data.humidity = dht.readHumidity();
     sensor_data.lux = myBH1750.getLux();
     sensor_data.water_level = digitalRead(WATER_LEVEL_PIN);
-    sensor_data.moisture_1 = (short int)analogRead(MOISTURE_PIN_1);
-    sensor_data.moisture_2 = (short int)analogRead(MOISTURE_PIN_2);
+    sensor_data.moisture_1 = (short int)readSoilMoisture(MOISTURE_PIN_1);
+    sensor_data.moisture_2 = (short int)readSoilMoisture(MOISTURE_PIN_2);
+    sensor_data.battery = (short int)analogRead(BATTERY_PIN);
 
     // Display if everything is being read correctly
     unsigned int normal = 1;
@@ -295,6 +299,18 @@ void measure_sensors()
     sensor_data.water_level, sensor_data.moisture_1, sensor_data.moisture_2, sensor_data.battery);
     DEBUG_PRINTLN(buffer);
     // delay(10000);
+}
+
+float readSoilMoisture(int pin) {
+  rawValue = analogRead(pin);
+  
+  // Calculate the soil moisture percentage (accounting for inverse relationship)
+  float percentage = map(rawValue, VALUEAT0, VALUEAT100, 0, 100);
+  
+  // Constrain the value to make sure it's between 0 and 100
+  percentage = constrain(percentage, 0, 100);
+  
+  return percentage;
 }
 
 void actuate()
