@@ -298,26 +298,15 @@ void measure_sensors()
 }
 
 void actuate()
-{   // I dont like that if
-    if ((sensor_data.moisture_1 < MOISTURE_THRESHOLD) &&
-        (sensor_data.lux > LUX_DAYLIGHT_THRESHOLD))
-    {
-        // TODO Actuate 
-
-    }
-
-    //TODO
-    /*
+{  
       control_light();
       control_temperature();
       control_bottle_sensor();
 
-      if(after 8am and before 6pm)
+      if(/*after 8am and before 6pm*/ true)
         control_soil_moisture();
-    */
 }
 
-/*
 
 float read_soil_moisture() {
   return (sensor_data.moisture_1 + sensor_data.moisture_2)/2;
@@ -348,12 +337,7 @@ void control_soil_moisture() {
   }
 }
 
-
-*/
-
-/*
-
-void control_temperature() {
+void control_temperature() {  //Check that the day is different
   if (sensor_data.temperature < TEMPERATURE_LOW_IDEAL){
     if (sensor_data.temperature < TEMPERATURE_LOW_THRESHOLD)
       DEBUG_PRINTLN("Move the plant to a warmer location. ");
@@ -364,7 +348,7 @@ void control_temperature() {
         DEBUG_PRINTLN("Move the plant to a warmer location. ");
     }
   }
-  else´
+  else
     cold_days = 0;
     
   if (sensor_data.temperature > TEMPERATURE_HIGH_IDEAL){
@@ -382,7 +366,7 @@ void control_temperature() {
 
 }
 
-void control_light() {
+void control_light() {  //Check that the day is different
   if (sensor_data.lux < LUX_LOW_IDEAL){
     if (sensor_data.lux < LUX_DAYLIGHT_THRESHOLD)
       DEBUG_PRINTLN("Move the plant to a lighter location. ");
@@ -393,7 +377,7 @@ void control_light() {
         DEBUG_PRINTLN("Move the plant to a lighter location. ");
     }
   }
-  else´
+  else
     shade_days = 0;
     
   if (sensor_data.lux > LUX_HIGH_IDEAL){
@@ -406,16 +390,10 @@ void control_light() {
     light_days = 0;
 }
 
-*/
-
-/*
-
 control_bottle_sensor() {
   if (water_level == 0) 
     DEBUG_PRINTLN("Fill the bottle of water. ");
 }
-
-*/
 
 void openValve() {
   myServo.write(VALVE_OPEN_DEGREES);
@@ -548,7 +526,4 @@ void loop()
   DEBUG_PRINTLN("Going to sleep zzzzz");
   enter_low_power_mode();
   DEBUG_PRINTLN("Back from sleep!");
-
-  //TODO 
-  // wait(60*60)
 }
