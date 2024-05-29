@@ -100,7 +100,25 @@
 #define DEBUG_PRINT_INIT(baud)  do {} while(0)
 #define DEBUG_PRINT(msg)        do {} while(0)
 #define DEBUG_PRINTLN(msg)      do {} while(0)
+
+
+
 #endif
+
+// Matrix states
+#define MATRIX_NORMAL           1
+#define MATRIX_ERROR            2
+#define MATRIX_NEED_WATER       3
+#define MATRIX_NEED_SUN         4
+#define MATRIX_NEED_SHADE       5
+#define MATRIX_NEED_WARM        6
+#define MATRIX_NEED_COLD        7
+
+#define MATRIX_NEED_SUN_NOW     8
+#define MATRIX_NEED_WARM_NOW    9
+#define MATRIX_NEED_COLD_NOW    10
+#define MATRIX_NEED_SHADE_NOW   11
+
 
 
 /*******************************************************************************/
@@ -200,18 +218,106 @@ const uint32_t bad_state[] = {
     0x56000000,
   };
 
-void light_up_matrix(unsigned int normal)
-{
-  if (normal)
-  {
-    matrix.loadFrame(logo);
-  }
-  else
-  {
-    matrix.loadFrame(bad_state);
-  }
+const uint32_t drop[] = {
+    0x0000400a,
+    0x01101101,
+    0x100e0000
+};
 
-  delay(2000); 
+
+const uint32_t sun[] = {
+    0x2481500e,
+    0x03f80e01,
+    0x50248000
+};
+
+const uint32_t shade[] = {
+    0x6ac4aa4a,
+    0xa6aa2ea2,
+    0xaa2aa6ac
+};
+
+const uint32_t too_cold[] = {
+    0x3b80a00a,
+    0x03a02202,
+    0x202203b8
+};
+
+
+
+const uint32_t too_warm[] = {
+    0x3a20a20a,
+    0x23a222a2,
+    0x2a22a3be
+};
+
+const uint32_t need_sun_now[] = {
+    0x0002a41c,
+    0x43e41c02,
+    0xa4000000
+};
+
+const uint32_t too_cold_now[] = {
+    0x77414414,
+    0x47444444,
+    0x44440774
+};
+
+const uint32_t too_warm_now[] = {
+    0x74514514,
+    0x57454454,
+    0x5545477d
+};
+
+const uint32_t shade_now[] = {
+    0xe0125523,
+    0x9e7d8398,
+    0x55800e01
+};
+
+void light_up_matrix(unsigned int matrix_state)
+{
+
+  switch(matrix_state) {
+        case MATRIX_NORMAL:
+            matrix.loadFrame(logo);
+            break;
+        case MATRIX_ERROR :
+            matrix.loadFrame(bad_state);
+            break;
+        case MATRIX_NEED_WATER:
+            matrix.loadFrame(drop);
+            break;
+        case MATRIX_NEED_SUN:
+            matrix.loadFrame(sun);
+            break;
+        case MATRIX_NEED_SHADE :
+            matrix.loadFrame(shade);
+            break;
+        case MATRIX_NEED_WARM :
+            matrix.loadFrame(too_cold);
+            break;
+        case MATRIX_NEED_COLD :
+            matrix.loadFrame(too_warm);
+            break;
+        case MATRIX_NEED_SUN_NOW :
+            matrix.loadFrame(need_sun_now);
+            break;
+        case MATRIX_NEED_WARM_NOW :
+            matrix.loadFrame(too_cold_now);
+            break;
+        case MATRIX_NEED_COLD_NOW :
+            matrix.loadFrame(too_warm);
+            break;
+        case MATRIX_NEED_SHADE_NOW :
+            matrix.loadFrame(shade_now);
+            break;
+        default:
+            matrix.loadFrame(bad_state);
+
+    }
+
+  delay(4000); 
 }
 
 /*******************************************************************************/
@@ -246,6 +352,8 @@ short int hot_days = 0;
 short int cold_days = 0;
 short int shade_days = 0;
 short int light_days = 0;
+bool different_day_temp = false;
+bool different_day_light = false;
 
 
 void sense_and_actuate()
@@ -302,7 +410,10 @@ void measure_sensors()
     normal &= sensor_data.temperature > 0.0 ? 1 : 0;
     normal &= sensor_data.humidity > 0.0 ? 1 : 0;
     normal &= sensor_data.lux > 0.0 ? 1 : 0;
-    light_up_matrix(normal);
+    if (normal)
+      light_up_matrix(MATRIX_NORMAL);
+    else
+      light_up_matrix(MATRIX_ERROR);
 
     char buffer[200];
     sprintf(buffer, "[%ld, %f, %f, %f, %d, %d, %d, %d]", sensor_data.unix_time, sensor_data.temperature, sensor_data.humidity, sensor_data.lux,
@@ -337,13 +448,15 @@ float readBat() {
 
 void actuate()
 {
-    control_light();
-    control_temperature();
-    control_bottle_sensor();
     RTCTime currentTime;
     RTC.getTime(currentTime);
     int hours = currentTime.getHour();
-    if(hours > 8 && hours < 18)
+
+    control_light(hours);
+    control_temperature(hours);
+    control_bottle_sensor();
+
+    if(hours >= 8 && hours <= 18)
       control_soil_moisture();
 }
 
@@ -361,10 +474,8 @@ void control_soil_moisture() {
   else if (sensor_data.humidity > 60)
     watering_duration *= 0.85;
 
-  DEBUG_PRINTLN("Im working1");
   // Principal cycle
   while (soil_moisture < MOISTURE_THRESHOLD && cycles < MAX_WATERING_CYCLES){
-    DEBUG_PRINTLN("Im working2");
     openValve(watering_duration);
 
     delay(1000*60);  // Wait for 1 minute to allow water to percolate
@@ -377,107 +488,115 @@ void control_soil_moisture() {
   }
 }
 
-bool different_day() {
-   //TODO
-   return true;
-}
 
 // CONTROL TEMPERATURE 
 
-void control_temperature() {
-    bool is_different_day = different_day();
+void control_temperature(int currentTime) {
 
     // Handle low temperature
     if (sensor_data.temperature < TEMPERATURE_LOW_IDEAL) {
-        handle_low_temperature(is_different_day);
+        handle_low_temperature();
     } else {
-      // If this keeps happening for a hole day then: //TODO
+      if (!different_day_temp && currentTime == 23)
         cold_days = 0; // Reset cold days counter
     }
 
     // Handle high temperature
     if (sensor_data.temperature > TEMPERATURE_HIGH_IDEAL) {
-        handle_high_temperature(is_different_day);
+        handle_high_temperature();
     } else {
-      // If this keeps happening for a hole day then: //TODO
+      if (!different_day_temp && currentTime == 23)
         hot_days = 0; // Reset hot days counter
     }
 }
 
-void handle_low_temperature(bool is_different_day) {
+void handle_low_temperature() {
     if (sensor_data.temperature < TEMPERATURE_LOW_THRESHOLD) {
-        DEBUG_PRINTLN("Move the plant to a warmer location.");
+        light_up_matrix(MATRIX_NEED_WARM_NOW);
+        DEBUG_PRINTLN("Move the plant to a warmer location now.");
         return;
     }
 
-    if (cold_days < MAX_NOT_IDEAL_DAYS && is_different_day) {
+    if (cold_days < MAX_NOT_IDEAL_DAYS && !different_day_temp) {
         cold_days++;
+        different_day_temp = true;
     } else {
+        light_up_matrix(MATRIX_NEED_WARM);
         DEBUG_PRINTLN("Move the plant to a warmer location.");
     }
 }
 
-void handle_high_temperature(bool is_different_day) {
+void handle_high_temperature() {
     if (sensor_data.temperature > TEMPERATURE_HIGH_THRESHOLD) {
-        DEBUG_PRINTLN("Move the plant to a cooler location.");
+        DEBUG_PRINTLN("Move the plant to a cooler location now.");
+        light_up_matrix(MATRIX_NEED_COLD_NOW);
         return;
     }
 
-    if (hot_days < MAX_NOT_IDEAL_DAYS && is_different_day) {
+    if (hot_days < MAX_NOT_IDEAL_DAYS && !different_day_temp) {
         hot_days++;
+        different_day_temp = true;
     } else {
         DEBUG_PRINTLN("Move the plant to a cooler location.");
+        light_up_matrix(MATRIX_NEED_COLD);
     }
 }
 
 // CONTROL LIGHT
 
-void control_light() {
-    bool is_different_day = different_day();
+void control_light(int currentTime) {
 
     // Handle low light
     if (sensor_data.lux < LUX_LOW_IDEAL) {
         handle_low_light();
     } else {
-      // If this keeps happening for a hole day then: //TODO
+      if (!different_day_light && currentTime == 23)
         shade_days = 0; // Reset shade days counter 
     }
 
     // Handle high light
     if (sensor_data.lux > LUX_HIGH_IDEAL) {
-        handle_high_light(is_different_day);
+        handle_high_light();
     } else {
-      // If this keeps happening for a hole day then: //TODO
+      if (!different_day_light && currentTime == 23)
         light_days = 0; // Reset light days counter 
     }
 }
 
 void handle_low_light() {
     if (sensor_data.lux < LUX_DAYLIGHT_THRESHOLD) {
-        DEBUG_PRINTLN("Move the plant to a lighter location.");
+        DEBUG_PRINTLN("Move the plant to a location with more light now.");
+        light_up_matrix(MATRIX_NEED_SUN_NOW);
         return;
     }
 
-    if (shade_days < MAX_NOT_IDEAL_DAYS) {
+    if (shade_days < MAX_NOT_IDEAL_DAYS && !different_day_light) {
         shade_days++;
+        different_day_light = true;
     } else {
         DEBUG_PRINTLN("Move the plant to a lighter location.");
+        light_up_matrix(MATRIX_NEED_SUN);
     }
 }
 
-void handle_high_light(bool is_different_day) {
-    if (light_days < MAX_NOT_IDEAL_DAYS && is_different_day) {
+void handle_high_light() {
+    if (light_days < MAX_NOT_IDEAL_DAYS && !different_day_light) {
         light_days++;
+        different_day_light = true;
     } else {
-        DEBUG_PRINTLN("Move the plant to a shadier location.");
+        DEBUG_PRINTLN("Move the plant to a location with more shade.");
+        light_up_matrix(MATRIX_NEED_SHADE);
     }
 }
 
 // CONTROL BOTTLE SENSOR
 
 void control_bottle_sensor() {
-  if (sensor_data.water_level == 0) 
-    DEBUG_PRINTLN("Fill the bottle of water. ");
+  if (sensor_data.water_level == 0) {
+    DEBUG_PRINTLN("Fill the bottle with water.");
+    light_up_matrix(MATRIX_NEED_WATER);
+  }
+
 }
 
 void openValve(float watering_duration) {
@@ -540,7 +659,8 @@ void enter_low_power_mode()
   RTC.getTime(currentTime);
   int minutes = currentTime.getMinutes();
   DEBUG_PRINTLN("The RTC is: " + String(currentTime));
-
+  int hour = currentTime.getHour();
+  DEBUG_PRINTLN("The hour is: " + String(hour));
   // Trigger the alarm every time the seconds are zero
   RTCTime alarmTime;
   alarmTime.setMinute(minutes+1);   // Wake up when minute matches
@@ -551,7 +671,7 @@ void enter_low_power_mode()
   //sets the alarm callback
   RTC.setAlarmCallback(alarmCallback, alarmTime, matchTime);
 
-  delay(100);   // Wait for previous operations to finish
+  delay(500);   // Wait for previous operations to finish
   asm volatile("wfi");           // Stop here and wait for an interrupt
 }
 

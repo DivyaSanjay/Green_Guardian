@@ -35,7 +35,7 @@ void setup() {
       Serial.println(buffer);
   }
   // Clear index
-  // EEPROM.write(0, 0);
+   EEPROM.write(0, 0);
 }
 
 void loop() {
