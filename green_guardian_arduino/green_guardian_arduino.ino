@@ -56,13 +56,20 @@
 #define TIMEZONE_OFFSET_HOURS (-7)
 
 // D
-#define WIFI_SSID 
-#define WIFI_PSWD 
 
 // Sensor thresholds
-#define BATTERY_THRESHOLD       1.0
-#define MOISTURE_THRESHOLD      1.0
-#define LUX_DAYLIGHT_THRESHOLD  1.0
+#define BATTERY_THRESHOLD       30
+#define MOISTURE_THRESHOLD      50 //Percentage
+#define LUX_DAYLIGHT_THRESHOLD  5,000.0 
+#define LUX_LOW_IDEAL 15,000.0
+#define LUX_HIGH_IDEAL  20,000.0
+#define TEMPERATURE_LOW_THRESHOLD  10   // THE PLANT NEEDS TO BE MOVED INMEDIATELLY
+#define TEMPERATURE_HIGH_THRESHOLD  32  // THE PLANT NEEDS TO BE MOVED INMEDIATELLY
+#define TEMPERATURE_LOW_IDEAL 21
+#define TEMPERATURE_HIGH_IDEAL  26
+#define MAX_NOT_IDEAL_DAYS  3
+#define INITIAL_WATERING_DURATION  300 //(5 minutes)
+#define MAX_WATERING_CYCLES  3
 // Pins
 #define BH1750_ADDRESS          0x23
 #define BATTERY_PIN             A3
@@ -76,6 +83,13 @@
 #define VALVE_OPEN_DEGREES      10
 #define VALVE_CLOSED_DEGREES    100
 #define ACTUATE_DURATION        4
+// Calibration values for soil moisture sensor (inverse relationship)
+#define VALUEAT0                500
+#define VALUEAT100              270
+
+// Calibration values for soil moisture sensor (inverse relationship)
+#define VALUEAT0BAT             0
+#define VALUEAT100BAT           850
 
 #define DEBUG_PRINT_ENABLED     1
 #if DEBUG_PRINT_ENABLED
@@ -93,8 +107,11 @@
 /* WI-FI Connection */
 /*******************************************************************************/
 
-char ssid[] = WIFI_SSID;        // your network SSID (name)
-char pass[] = WIFI_PSWD;    // your network password (use for WPA, or use as key for WEP)
+char ssid[] = "VDCNorte-MyCampusNet-Legacy";        // your network SSID (name)
+char pass[] = "Cryptic-Album-67$";    // your network password (use for WPA, or use as key for WEP)
+
+ArduinoLEDMatrix matrix;
+
 
 int wifiStatus = WL_IDLE_STATUS;
 WiFiUDP Udp; // A UDP instance to let us send and receive packets over UDP
@@ -185,8 +202,6 @@ const uint32_t bad_state[] = {
 
 void light_up_matrix(unsigned int normal)
 {
-  ArduinoLEDMatrix matrix;
-  matrix.begin();
   if (normal)
   {
     matrix.loadFrame(logo);
@@ -195,11 +210,20 @@ void light_up_matrix(unsigned int normal)
   {
     matrix.loadFrame(bad_state);
   }
+
+  delay(2000); 
 }
 
 /*******************************************************************************/
 /* Sense & Actuate */
 /*******************************************************************************/
+
+/*
+ aDDR 0 => DATA LENGTH
+ 32 => STRUCTURE [1]
+ 64 [2]
+
+*/
 
 // Size of structure: 32 bytes
 struct {
@@ -210,7 +234,7 @@ struct {
   int     water_level;  // 4 bytes
   short int   moisture_1;     // 2 bytes
   short int   moisture_2;     // 2 bytes
-  float   battery;      // 4 bytes
+  int   battery;      // 4 bytes
 } sensor_data;
 
 // Sensor objects
@@ -218,6 +242,11 @@ BH1750_WE myBH1750(BH1750_ADDRESS);
 DHT dht(DHT_PIN, DHT_TYPE);
 boolean valveOpen;
 Servo myServo;
+short int hot_days = 0;
+short int cold_days = 0;
+short int shade_days = 0;
+short int light_days = 0;
+
 
 void sense_and_actuate()
 {
@@ -228,7 +257,6 @@ void sense_and_actuate()
     RTCTime currentTime;
     RTC.getTime(currentTime);
     sensor_data.unix_time = currentTime.getUnixTime();
-
     // 3. Do measurements
     measure_sensors();
 
@@ -263,8 +291,9 @@ void measure_sensors()
     sensor_data.humidity = dht.readHumidity();
     sensor_data.lux = myBH1750.getLux();
     sensor_data.water_level = digitalRead(WATER_LEVEL_PIN);
-    sensor_data.moisture_1 = (short int)analogRead(MOISTURE_PIN_1);
-    sensor_data.moisture_2 = (short int)analogRead(MOISTURE_PIN_2);
+    sensor_data.moisture_1 = (short int)readSoilMoisture(MOISTURE_PIN_1);
+    sensor_data.moisture_2 = (short int)readSoilMoisture(MOISTURE_PIN_2);
+    
 
     // Display if everything is being read correctly
     unsigned int normal = 1;
@@ -276,25 +305,187 @@ void measure_sensors()
     light_up_matrix(normal);
 
     char buffer[200];
-    sprintf(buffer, "[%ld, %f, %f, %f, %d, %d, %d, %f]", sensor_data.unix_time, sensor_data.temperature, sensor_data.humidity, sensor_data.lux,
+    sprintf(buffer, "[%ld, %f, %f, %f, %d, %d, %d, %d]", sensor_data.unix_time, sensor_data.temperature, sensor_data.humidity, sensor_data.lux,
     sensor_data.water_level, sensor_data.moisture_1, sensor_data.moisture_2, sensor_data.battery);
     DEBUG_PRINTLN(buffer);
     // delay(10000);
 }
 
+float readSoilMoisture(int pin) {
+  float rawValue = analogRead(pin);
+  
+  // Calculate the soil moisture percentage (accounting for inverse relationship)
+  float percentage = map(rawValue, VALUEAT0, VALUEAT100, 0, 100);
+  
+  // Constrain the value to make sure it's between 0 and 100
+  percentage = constrain(percentage, 0, 100);
+  
+  return percentage;
+}
+
+float readBat() {
+  float rawValue = analogRead(BATTERY_PIN);
+  
+  // Calculate the soil moisture percentage (accounting for inverse relationship)
+  float percentage = map(rawValue, VALUEAT0BAT, VALUEAT100BAT, 0, 100);
+  
+  // Constrain the value to make sure it's between 0 and 100
+  percentage = constrain(percentage, 0, 100);
+  
+  return percentage;
+}
+
 void actuate()
 {
-    if ((sensor_data.moisture_1 < MOISTURE_THRESHOLD) &&
-        (sensor_data.lux > LUX_DAYLIGHT_THRESHOLD))
-    {
-        // TODO Actuate        
+    control_light();
+    control_temperature();
+    control_bottle_sensor();
+    RTCTime currentTime;
+    RTC.getTime(currentTime);
+    int hours = currentTime.getHour();
+    if(hours > 8 && hours < 18)
+      control_soil_moisture();
+}
+
+
+// CONTROL SOIL MOISTURE
+
+void control_soil_moisture() {
+  float soil_moisture = sensor_data.moisture_1;
+  short int cycles = 0;
+  float watering_duration = INITIAL_WATERING_DURATION;
+
+  // Adjust watering duration based on humidity
+  if (sensor_data.humidity < 40) 
+    watering_duration *= 1.25;
+  else if (sensor_data.humidity > 60)
+    watering_duration *= 0.85;
+
+  DEBUG_PRINTLN("Im working1");
+  // Principal cycle
+  while (soil_moisture < MOISTURE_THRESHOLD && cycles < MAX_WATERING_CYCLES){
+    DEBUG_PRINTLN("Im working2");
+    openValve(watering_duration);
+
+    delay(1000*60);  // Wait for 1 minute to allow water to percolate
+    measure_sensors();
+    soil_moisture = sensor_data.moisture_1;
+    cycles += 1;
+    if (soil_moisture < MOISTURE_THRESHOLD)
+      // Increase watering duration if the soil is still dry
+      watering_duration *= 1.35;
+  }
+}
+
+bool different_day() {
+   //TODO
+   return true;
+}
+
+// CONTROL TEMPERATURE 
+
+void control_temperature() {
+    bool is_different_day = different_day();
+
+    // Handle low temperature
+    if (sensor_data.temperature < TEMPERATURE_LOW_IDEAL) {
+        handle_low_temperature(is_different_day);
+    } else {
+      // If this keeps happening for a hole day then: //TODO
+        cold_days = 0; // Reset cold days counter
+    }
+
+    // Handle high temperature
+    if (sensor_data.temperature > TEMPERATURE_HIGH_IDEAL) {
+        handle_high_temperature(is_different_day);
+    } else {
+      // If this keeps happening for a hole day then: //TODO
+        hot_days = 0; // Reset hot days counter
     }
 }
 
-void openValve() {
+void handle_low_temperature(bool is_different_day) {
+    if (sensor_data.temperature < TEMPERATURE_LOW_THRESHOLD) {
+        DEBUG_PRINTLN("Move the plant to a warmer location.");
+        return;
+    }
+
+    if (cold_days < MAX_NOT_IDEAL_DAYS && is_different_day) {
+        cold_days++;
+    } else {
+        DEBUG_PRINTLN("Move the plant to a warmer location.");
+    }
+}
+
+void handle_high_temperature(bool is_different_day) {
+    if (sensor_data.temperature > TEMPERATURE_HIGH_THRESHOLD) {
+        DEBUG_PRINTLN("Move the plant to a cooler location.");
+        return;
+    }
+
+    if (hot_days < MAX_NOT_IDEAL_DAYS && is_different_day) {
+        hot_days++;
+    } else {
+        DEBUG_PRINTLN("Move the plant to a cooler location.");
+    }
+}
+
+// CONTROL LIGHT
+
+void control_light() {
+    bool is_different_day = different_day();
+
+    // Handle low light
+    if (sensor_data.lux < LUX_LOW_IDEAL) {
+        handle_low_light();
+    } else {
+      // If this keeps happening for a hole day then: //TODO
+        shade_days = 0; // Reset shade days counter 
+    }
+
+    // Handle high light
+    if (sensor_data.lux > LUX_HIGH_IDEAL) {
+        handle_high_light(is_different_day);
+    } else {
+      // If this keeps happening for a hole day then: //TODO
+        light_days = 0; // Reset light days counter 
+    }
+}
+
+void handle_low_light() {
+    if (sensor_data.lux < LUX_DAYLIGHT_THRESHOLD) {
+        DEBUG_PRINTLN("Move the plant to a lighter location.");
+        return;
+    }
+
+    if (shade_days < MAX_NOT_IDEAL_DAYS) {
+        shade_days++;
+    } else {
+        DEBUG_PRINTLN("Move the plant to a lighter location.");
+    }
+}
+
+void handle_high_light(bool is_different_day) {
+    if (light_days < MAX_NOT_IDEAL_DAYS && is_different_day) {
+        light_days++;
+    } else {
+        DEBUG_PRINTLN("Move the plant to a shadier location.");
+    }
+}
+
+// CONTROL BOTTLE SENSOR
+
+void control_bottle_sensor() {
+  if (sensor_data.water_level == 0) 
+    DEBUG_PRINTLN("Fill the bottle of water. ");
+}
+
+void openValve(float watering_duration) {
   myServo.write(VALVE_OPEN_DEGREES);
   valveOpen = true;
   DEBUG_PRINTLN("Valve opened.");
+  delay(1000*watering_duration);
+  closeValve();
 }
 
 void closeValve() {
@@ -340,6 +531,7 @@ void store_data()
 /* Sleep */
 /*******************************************************************************/
 
+//TODO THIS SHOULD ALSO SHUT DOWN THE PROGRAM FOR AN HOUR
 void enter_low_power_mode()
 {
   // Retrieve the date and time from the RTC and print them
@@ -389,6 +581,8 @@ void alarmCallback() {
 /*******************************************************************************/
 
 void setup(){
+
+  matrix.begin();
   // 1. Initialize Serial comm if needed
   DEBUG_PRINT_INIT(9600);
 
@@ -410,12 +604,16 @@ void setup(){
 void loop()
 {
   // 1. TODO Read battery
+  DEBUG_PRINTLN("SENSING");
+  sensor_data.battery = (int)readBat();
 
-  // 2. Sense and actuate
-  sense_and_actuate();
+  if(sensor_data.battery > BATTERY_THRESHOLD) {
+    // 2. Sense and actuate
+    sense_and_actuate();
 
-  // 3. Store/Send data
-  store_data();
+    // 3. Store/Send data
+    store_data();
+  }
 
   // 4. Enter low power mode
   DEBUG_PRINTLN("Going to sleep zzzzz");
