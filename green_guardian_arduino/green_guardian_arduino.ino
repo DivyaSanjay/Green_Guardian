@@ -60,9 +60,8 @@
 // Sensor thresholds
 #define BATTERY_THRESHOLD       30
 #define MOISTURE_THRESHOLD      50 //Percentage
-#define LUX_DAYLIGHT_THRESHOLD  5,000.0 
-#define LUX_LOW_IDEAL 15,000.0
-#define LUX_HIGH_IDEAL  20,000.0
+#define LUX_LOW_THRESHOLD 5,000.0
+#define LUX_HIGH_THRESHOLD  30,000.0
 #define TEMPERATURE_LOW_THRESHOLD  10   // THE PLANT NEEDS TO BE MOVED INMEDIATELLY
 #define TEMPERATURE_HIGH_THRESHOLD  32  // THE PLANT NEEDS TO BE MOVED INMEDIATELLY
 #define TEMPERATURE_LOW_IDEAL 21
@@ -336,7 +335,7 @@ struct {
   time_t  unix_time;    // Timestamp 8 bytes
   float   temperature;  // 4 bytes
   float   humidity;     // 4 bytes
-  float   lux;          // 4 bytes
+  float   lux;          // 4 bytes   // I suppose this is the average
   int     water_level;  // 4 bytes
   short int   moisture_1;     // 2 bytes
   short int   moisture_2;     // 2 bytes
@@ -353,7 +352,6 @@ short int cold_days = 0;
 short int shade_days = 0;
 short int light_days = 0;
 bool different_day_temp = false;
-bool different_day_light = false;
 
 
 void sense_and_actuate()
@@ -547,32 +545,25 @@ void handle_high_temperature() {
 void control_light(int currentTime) {
 
     // Handle low light
-    if (sensor_data.lux < LUX_LOW_IDEAL) {
+    if (sensor_data.lux < LUX_LOW_THRESHOLD) {
         handle_low_light();
     } else {
-      if (!different_day_light && currentTime == 23)
+      if (currentTime == 23)
         shade_days = 0; // Reset shade days counter 
     }
 
     // Handle high light
-    if (sensor_data.lux > LUX_HIGH_IDEAL) {
+    if (sensor_data.lux > LUX_HIGH_THRESHOLD) {
         handle_high_light();
     } else {
-      if (!different_day_light && currentTime == 23)
+      if (currentTime == 23)
         light_days = 0; // Reset light days counter 
     }
 }
 
-void handle_low_light() {
-    if (sensor_data.lux < LUX_DAYLIGHT_THRESHOLD) {
-        DEBUG_PRINTLN("Move the plant to a location with more light now.");
-        light_up_matrix(MATRIX_NEED_SUN_NOW);
-        return;
-    }
-
-    if (shade_days < MAX_NOT_IDEAL_DAYS && !different_day_light) {
+void handle_low_light(int currentTime) {
+    if (shade_days < MAX_NOT_IDEAL_DAYS && currentTime == 23) {
         shade_days++;
-        different_day_light = true;
     } else {
         DEBUG_PRINTLN("Move the plant to a lighter location.");
         light_up_matrix(MATRIX_NEED_SUN);
@@ -580,9 +571,8 @@ void handle_low_light() {
 }
 
 void handle_high_light() {
-    if (light_days < MAX_NOT_IDEAL_DAYS && !different_day_light) {
+    if (light_days < MAX_NOT_IDEAL_DAYS) {
         light_days++;
-        different_day_light = true;
     } else {
         DEBUG_PRINTLN("Move the plant to a location with more shade.");
         light_up_matrix(MATRIX_NEED_SHADE);
@@ -593,7 +583,7 @@ void handle_high_light() {
 
 void control_bottle_sensor() {
   if (sensor_data.water_level == 0) {
-    DEBUG_PRINTLN("Fill the bottle with water.");
+    DEBUG_PRINTLN("Fill the bottle with water. ");
     light_up_matrix(MATRIX_NEED_WATER);
   }
 
