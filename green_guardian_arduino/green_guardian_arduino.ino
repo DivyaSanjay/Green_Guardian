@@ -61,8 +61,18 @@
 
 // Sensor thresholds
 #define BATTERY_THRESHOLD       1.0
-#define MOISTURE_THRESHOLD      1.0
-#define LUX_DAYLIGHT_THRESHOLD  1.0
+#define MOISTURE_THRESHOLD      0.5 //Percentage
+#define LUX_DAYLIGHT_THRESHOLD  5,000.0 
+#define LUX_LOW_IDEAL 15,000.0
+#define LUX_HIGH_IDEAL  20,000.0
+#define TEMPERATURE_LOW_THRESHOLD  10   // THE PLANT NEEDS TO BE MOVED INMEDIATELLY
+#define TEMPERATURE_HIGH_THRESHOLD  32  // THE PLANT NEEDS TO BE MOVED INMEDIATELLY
+#define TEMPERATURE_LOW_IDEAL 21
+#define TEMPERATURE_HIGH_IDEAL  26
+#define MAX_NOT_IDEAL_DAYS  3
+#define INITIAL_WATERING_DURATION  600 //(10 minutes)
+#define MAX_WATERING_CYCLES  3
+
 // Pins
 #define BH1750_ADDRESS          0x23
 #define BATTERY_PIN             A3
@@ -208,7 +218,7 @@ struct {
   float   humidity;     // 4 bytes
   float   lux;          // 4 bytes
   int     water_level;  // 4 bytes
-  short int   moisture_1;     // 2 bytes
+  short int   moisture_1;     // 2 bytes  //TODO we have to make moisture be percentage
   short int   moisture_2;     // 2 bytes
   float   battery;      // 4 bytes
 } sensor_data;
@@ -218,6 +228,11 @@ BH1750_WE myBH1750(BH1750_ADDRESS);
 DHT dht(DHT_PIN, DHT_TYPE);
 boolean valveOpen;
 Servo myServo;
+// short int hot_days = 0;
+// short iny cold_days = 0;
+// short int shade_days = 0;
+// short int light_days = 0;
+
 
 void sense_and_actuate()
 {
@@ -283,13 +298,124 @@ void measure_sensors()
 }
 
 void actuate()
-{
+{   // I dont like that if
     if ((sensor_data.moisture_1 < MOISTURE_THRESHOLD) &&
         (sensor_data.lux > LUX_DAYLIGHT_THRESHOLD))
     {
-        // TODO Actuate        
+        // TODO Actuate 
+
     }
+
+    //TODO
+    /*
+      control_light();
+      control_temperature();
+      control_bottle_sensor();
+
+      if(after 8am and before 6pm)
+        control_soil_moisture();
+    */
 }
+
+/*
+
+float read_soil_moisture() {
+  return (sensor_data.moisture_1 + sensor_data.moisture_2)/2;
+}
+
+void control_soil_moisture() {
+  soil_moisture = read_soil_moisture();
+  cycles = 0;
+  watering_duration = INITIAL_WATERING_DURATION;
+
+  // Adjust watering duration based on humidity
+  if (humidity < 40)
+    watering_duration = base_watering_duration * 1.25
+  else if (humidity > 60)
+    watering_duration = base_watering_duration * 0.85
+
+
+  // Principal cycle
+  while (soil_moisture < MOISTURE_THRESHOLD && cycles < MAX_WATERING_CYCLES){
+    openValve(watering_duration);
+    wait(60)  // Wait for 1 minute to allow water to percolate
+    measure_sensors();
+    soil_moisture = read_soil_moisture();
+    cycles += 1
+    if (soil_moisture < MOISTURE_THRESHOLD)
+      // Increase watering duration if the soil is still dry
+      watering_duration *= 1.35
+  }
+}
+
+
+*/
+
+/*
+
+void control_temperature() {
+  if (sensor_data.temperature < TEMPERATURE_LOW_IDEAL){
+    if (sensor_data.temperature < TEMPERATURE_LOW_THRESHOLD)
+      DEBUG_PRINTLN("Move the plant to a warmer location. ");
+    else {
+      if (cold_days < MAX_NOT_IDEAL_DAYS)
+        cold_days++;
+      else 
+        DEBUG_PRINTLN("Move the plant to a warmer location. ");
+    }
+  }
+  else´
+    cold_days = 0;
+    
+  if (sensor_data.temperature > TEMPERATURE_HIGH_IDEAL){
+    if (sensor_data.temperature > TEMPERATURE_HIGH_THRESHOLD)
+      DEBUG_PRINTLN("Move the plant to a cooler location. ");
+    else {
+      if (hot_days < MAX_NOT_IDEAL_DAYS)
+        hot_days++;
+      else 
+        DEBUG_PRINTLN("Move the plant to a cooler location. ");
+    }
+  }
+  else
+    hot_days = 0;
+
+}
+
+void control_light() {
+  if (sensor_data.lux < LUX_LOW_IDEAL){
+    if (sensor_data.lux < LUX_DAYLIGHT_THRESHOLD)
+      DEBUG_PRINTLN("Move the plant to a lighter location. ");
+    else {
+      if (shade_days < MAX_NOT_IDEAL_DAYS)
+        shade_days++;
+      else 
+        DEBUG_PRINTLN("Move the plant to a lighter location. ");
+    }
+  }
+  else´
+    shade_days = 0;
+    
+  if (sensor_data.lux > LUX_HIGH_IDEAL){
+    if (light_days < MAX_NOT_IDEAL_DAYS)
+      light_days++;
+    else 
+      DEBUG_PRINTLN("Move the plant to a shadier location. ");
+  }
+  else
+    light_days = 0;
+}
+
+*/
+
+/*
+
+control_bottle_sensor() {
+  if (water_level == 0) 
+    DEBUG_PRINTLN("Fill the bottle of water. ");
+}
+
+*/
 
 void openValve() {
   myServo.write(VALVE_OPEN_DEGREES);
@@ -412,6 +538,7 @@ void loop()
   // 1. TODO Read battery
 
   // 2. Sense and actuate
+  //If energy allows this, I guess you would do that in power up sensors????
   sense_and_actuate();
 
   // 3. Store/Send data
@@ -421,4 +548,7 @@ void loop()
   DEBUG_PRINTLN("Going to sleep zzzzz");
   enter_low_power_mode();
   DEBUG_PRINTLN("Back from sleep!");
+
+  //TODO 
+  // wait(60*60)
 }
