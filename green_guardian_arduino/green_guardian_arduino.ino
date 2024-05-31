@@ -51,6 +51,8 @@
 #define SYSTEM_SBYCR    ((volatile unsigned short *)(SYSTEM + 0xE00C))  // Standby Control Register
 #define SYSTEM_PRCR     ((volatile unsigned short *)(SYSTEM + 0xE3FE))  // Protect Register
 #define ICU_WPEN        ((volatile unsigned *)0x400061A0)
+#define SYSTEM_OPCCR ((volatile unsigned *)0x4001E0A0)
+#define SYSTEM_SCKDIVCR ((volatile unsigned *)0x4001E020)
 
 // PDT
 #define TIMEZONE_OFFSET_HOURS (-7)
@@ -124,8 +126,8 @@
 /* WI-FI Connection */
 /*******************************************************************************/
 
-char ssid[] = "VDCNorte-MyCampusNet-Legacy";        // your network SSID (name)
-char pass[] = "Cryptic-Album-67$";    // your network password (use for WPA, or use as key for WEP)
+char ssid[] = "PlazaVerde-MyCampusNet-Legacy";        // your network SSID (name)
+char pass[] = "Woolly-Pride-60&";    // your network password (use for WPA, or use as key for WEP)
 
 ArduinoLEDMatrix matrix;
 
@@ -388,7 +390,7 @@ void setup_sensors()
       // while (1) {}
     }
     pinMode(WATER_LEVEL_PIN,INPUT);
-    closeValve(); // Ensure the valve is closed on startup
+    // closeValve(); // Ensure the valve is closed on startup
 }
 
 void measure_sensors()
@@ -422,12 +424,18 @@ void measure_sensors()
 
 float readSoilMoisture(int pin) {
   float rawValue = analogRead(pin);
+  //DEBUG_PRINT("raw");
+  //DEBUG_PRINTLN(rawValue);
   
   // Calculate the soil moisture percentage (accounting for inverse relationship)
   float percentage = map(rawValue, VALUEAT0, VALUEAT100, 0, 100);
+  //DEBUG_PRINT("pct1");
+  //DEBUG_PRINTLN(percentage);
   
   // Constrain the value to make sure it's between 0 and 100
   percentage = constrain(percentage, 0, 100);
+  //DEBUG_PRINT("pct");
+  //DEBUG_PRINTLN(percentage);
   
   return percentage;
 }
@@ -453,9 +461,11 @@ void actuate()
     control_light(hours);
     control_temperature(hours);
     control_bottle_sensor();
-
-    if(hours >= 8 && hours <= 18)
+    //Water only in between 8:00 A.M. and 7:00 P.M.
+    if(hours >= 8 && hours <= 19)
       control_soil_moisture();
+    else 
+    DEBUG_PRINTLN("Not watering because after hours");
 }
 
 
@@ -476,7 +486,7 @@ void control_soil_moisture() {
   while (soil_moisture < MOISTURE_THRESHOLD && cycles < MAX_WATERING_CYCLES){
     openValve(watering_duration);
 
-    delay(1000*60);  // Wait for 1 minute to allow water to percolate
+    delay(1000*120);  // Wait for 1 minute to allow water to percolate
     measure_sensors();
     soil_moisture = sensor_data.moisture_1;
     cycles += 1;
@@ -546,7 +556,7 @@ void control_light(int currentTime) {
 
     // Handle low light
     if (sensor_data.lux < LUX_LOW_THRESHOLD) {
-        handle_low_light();
+        handle_low_light(currentTime);
     } else {
       if (currentTime == 23)
         shade_days = 0; // Reset shade days counter 
@@ -554,7 +564,7 @@ void control_light(int currentTime) {
 
     // Handle high light
     if (sensor_data.lux > LUX_HIGH_THRESHOLD) {
-        handle_high_light();
+        handle_high_light(currentTime);
     } else {
       if (currentTime == 23)
         light_days = 0; // Reset light days counter 
@@ -570,8 +580,8 @@ void handle_low_light(int currentTime) {
     }
 }
 
-void handle_high_light() {
-    if (light_days < MAX_NOT_IDEAL_DAYS) {
+void handle_high_light(int currentTime) {
+    if (light_days < MAX_NOT_IDEAL_DAYS && currentTime == 23) {
         light_days++;
     } else {
         DEBUG_PRINTLN("Move the plant to a location with more shade.");
@@ -624,6 +634,7 @@ void store_data()
 
     if (data_addr < 8000)
     {
+      DEBUG_PRINTLN("Writing sensor data to EEPROM");
       DEBUG_PRINTLN(data_length);
       DEBUG_PRINTLN(data_addr);
       EEPROM.put(data_addr, sensor_data);
@@ -640,23 +651,26 @@ void store_data()
 /* Sleep */
 /*******************************************************************************/
 
-//TODO THIS SHOULD ALSO SHUT DOWN THE PROGRAM FOR AN HOUR
-void enter_low_power_mode()
+void enter_low_power_mode(bool wake_up_hour)
 {
   // Retrieve the date and time from the RTC and print them
-  RTCTime currentTime;
-  AlarmMatch alarm;
+  RTCTime currentTime, alarmTime;
+  AlarmMatch alarm, matchTime;
   RTC.getTime(currentTime);
-  int minutes = currentTime.getMinutes();
-  DEBUG_PRINTLN("The RTC is: " + String(currentTime));
-  int hour = currentTime.getHour();
-  DEBUG_PRINTLN("The hour is: " + String(hour));
-  // Trigger the alarm every time the seconds are zero
-  RTCTime alarmTime;
-  alarmTime.setMinute(minutes+1);   // Wake up when minute matches
-  // Make sure to only match on the seconds in this example - not on any other parts of the date/time
-  AlarmMatch matchTime;
-  matchTime.addMatchMinute();
+  int minutes, hour;
+  if (wake_up_hour == 0){
+    hour = currentTime.getHour();
+    alarmTime.setHour(hour + 3);
+    matchTime.addMatchHour();
+    DEBUG_PRINTLN("Dark Times: GreenGuardian will wake up in 3 hours");
+  }
+  else
+  {
+    minutes = currentTime.getMinutes();
+    alarmTime.setMinute(minutes);
+    matchTime.addMatchMinute();
+    DEBUG_PRINTLN("Lumos: GreenGuardian will wake up in 1 hour");
+  }
 
   //sets the alarm callback
   RTC.setAlarmCallback(alarmCallback, alarmTime, matchTime);
@@ -691,7 +705,6 @@ void alarmCallback() {
 /*******************************************************************************/
 
 void setup(){
-
   matrix.begin();
   // 1. Initialize Serial comm if needed
   DEBUG_PRINT_INIT(9600);
@@ -713,20 +726,31 @@ void setup(){
 
 void loop()
 {
+  //sense_and_actuate();
   // 1. TODO Read battery
-  DEBUG_PRINTLN("SENSING");
   sensor_data.battery = (int)readBat();
-
+  bool wake_up_hour = 1;
   if(sensor_data.battery > BATTERY_THRESHOLD) {
     // 2. Sense and actuate
     sense_and_actuate();
+    wake_up_hour = 1;
 
     // 3. Store/Send data
+   store_data();
+  }
+  else if(sensor_data.battery < BATTERY_THRESHOLD && sensor_data.lux > LUX_LOW_THRESHOLD){
+  // 2. Sense and actuate
+    sense_and_actuate();
+     // 3. Store/Send data
     store_data();
+    wake_up_hour = 1;
+  }
+  else{
+     wake_up_hour = 0;
   }
 
   // 4. Enter low power mode
   DEBUG_PRINTLN("Going to sleep zzzzz");
-  enter_low_power_mode();
+  enter_low_power_mode(wake_up_hour);
   DEBUG_PRINTLN("Back from sleep!");
 }
