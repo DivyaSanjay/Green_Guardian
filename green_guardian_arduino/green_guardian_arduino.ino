@@ -62,6 +62,7 @@
 // Sensor thresholds
 #define BATTERY_THRESHOLD       30
 #define MOISTURE_THRESHOLD      20 //Percentage
+#define MOISTURE_HIGH_THRESHOLD      70 //Percentage
 #define LUX_LOW_THRESHOLD 6,522.0
 #define LUX_HIGH_THRESHOLD  26,087.0
 #define TEMPERATURE_LOW_THRESHOLD  10   // THE PLANT NEEDS TO BE MOVED INMEDIATELLY
@@ -467,46 +468,47 @@ float readBat() {
 
 void actuate()
 {
-    RTCTime currentTime;
-    RTC.getTime(currentTime);
-    int hours = currentTime.getHour();
-
-    control_light(hours);
-    control_temperature(hours);
-    control_bottle_sensor();
-    //Water only in between 8:00 A.M. and 7:00 P.M.
-    if(hours >= 8 && hours <= 19)
-      control_soil_moisture();
-    else 
-    DEBUG_PRINTLN("Not watering because after hours");
+  RTCTime currentTime;
+  RTC.getTime(currentTime);
+  int hours = currentTime.getHour();
+  control_light(hours);
+  control_temperature(hours);
+  control_bottle_sensor();
+  control_soil_moisture(hours);
 }
 
 
 // CONTROL SOIL MOISTURE
 
-void control_soil_moisture() {
+void control_soil_moisture(int currentTime) {
   float soil_moisture = sensor_data.moisture_1;
-  DEBUG_PRINTLN(soil_moisture);
-  short int cycles = 0;
-  float watering_duration = INITIAL_WATERING_DURATION;
+  if(soil_moisture > MOISTURE_HIGH_THRESHOLD){
+    DEBUG_PRINTLN("Move the plant indoors. Excesive moisture. ");
+  }
 
-  // Adjust watering duration based on humidity
-  if (sensor_data.humidity < HUMIDITY_LOW_IDEAL) 
-    watering_duration *= 1.15;
-  else if (sensor_data.humidity > HUMIDITY_HIGH_IDEAL)
-    watering_duration *= 0.85;
+  //Water only in between 8:00 A.M. and 7:00 P.M.
+  else if(currentTime >= 8 && currentTime <= 19) {
+    short int cycles = 0;
+    float watering_duration = INITIAL_WATERING_DURATION;
 
-  // Principal cycle
-  while (soil_moisture < MOISTURE_THRESHOLD && cycles < MAX_WATERING_CYCLES){
-    openValve(watering_duration);
-
-    delay(1000*60);  // Wait for 1 minute to allow water to percolate
-    measure_sensors();
-    soil_moisture = sensor_data.moisture_1;
-    cycles += 1;
-    if (soil_moisture < MOISTURE_THRESHOLD)
-      // Increase watering duration if the soil is still dry
+    // Adjust watering duration based on humidity
+    if (sensor_data.humidity < HUMIDITY_LOW_IDEAL) 
+      watering_duration *= 1.15;
+    else if (sensor_data.humidity > HUMIDITY_HIGH_IDEAL)
       watering_duration *= 0.85;
+
+    // Principal cycle
+    while (soil_moisture < MOISTURE_THRESHOLD && cycles < MAX_WATERING_CYCLES){
+      openValve(watering_duration);
+
+      delay(1000*60);  // Wait for 1 minute to allow water to percolate
+      measure_sensors();
+      soil_moisture = sensor_data.moisture_1;
+      cycles += 1;
+      if (soil_moisture < MOISTURE_THRESHOLD)
+        // Increase watering duration if the soil is still dry
+        watering_duration *= 0.85;
+    }
   }
 }
 
