@@ -9,7 +9,7 @@ struct {
   int     water_level;  // 4 bytes
   short int   moisture_1;     // 2 bytes
   short int   moisture_2;     // 2 bytes
-  float   battery;      // 4 bytes
+  int   battery;      // 4 bytes
 } sensor_data;
 
 void setup() {
@@ -30,12 +30,12 @@ void setup() {
   {
       data_addr = (i + 1) * sizeof(sensor_data);
       EEPROM.get(data_addr, sensor_data);
-      sprintf(buffer, "[%ld, %f, %f, %f, %d, %d, %d, %f]", sensor_data.unix_time, sensor_data.temperature, sensor_data.humidity, sensor_data.lux,
+      sprintf(buffer, "[%ld, %f, %f, %f, %d, %d, %d, %d]", sensor_data.unix_time, sensor_data.temperature, sensor_data.humidity, sensor_data.lux,
         sensor_data.water_level, sensor_data.moisture_1, sensor_data.moisture_2, sensor_data.battery);
       Serial.println(buffer);
   }
   // Clear index
-   EEPROM.write(0, 0);
+ //  EEPROM.write(0, 0);
 }
 
 void loop() {
