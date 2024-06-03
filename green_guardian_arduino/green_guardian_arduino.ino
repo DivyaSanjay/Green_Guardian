@@ -506,7 +506,7 @@ void control_soil_moisture() {
     cycles += 1;
     if (soil_moisture < MOISTURE_THRESHOLD)
       // Increase watering duration if the soil is still dry
-      watering_duration *= 1.15;
+      watering_duration *= 0.85;
   }
 }
 
