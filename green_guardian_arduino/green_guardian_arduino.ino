@@ -573,6 +573,8 @@ void handle_high_temperature() {
 // CONTROL LIGHT
 
 void control_light(int currentTime) {
+
+  // to calculate the average
   if(currentTime >= 8 && currentTime <= 19) {
     lux_sum += sensor_data.lux;
     lux_times++;
@@ -601,8 +603,8 @@ void handle_low_light(int currentTime) {
     if (shade_days < MAX_NOT_IDEAL_DAYS) {
         shade_days++;
     } else {
-        //DEBUG_PRINTLN("Move the plant to a lighter location.");
-        //light_up_matrix(MATRIX_NEED_SUN);
+        DEBUG_PRINTLN("Move the plant to a lighter location.");
+        light_up_matrix(MATRIX_NEED_SUN);
     }
 }
 
@@ -610,8 +612,8 @@ void handle_high_light(int currentTime) {
     if (light_days < MAX_NOT_IDEAL_DAYS) {
         light_days++;
     } else {
-        //DEBUG_PRINTLN("Move the plant to a location with more shade.");
-        //light_up_matrix(MATRIX_NEED_SHADE);
+        DEBUG_PRINTLN("Move the plant to a location with more shade.");
+        light_up_matrix(MATRIX_NEED_SHADE);
     }
 }
 
