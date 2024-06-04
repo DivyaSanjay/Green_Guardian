@@ -72,7 +72,7 @@
 #define HUMIDITY_LOW_IDEAL 40
 #define HUMIDITY_HIGH_IDEAL  60
 #define MAX_NOT_IDEAL_DAYS  3
-#define INITIAL_WATERING_DURATION  300 //(5 minutes)
+#define INITIAL_WATERING_DURATION  180 //(3 minutes)
 #define MAX_WATERING_CYCLES  3
 // Pins
 #define BH1750_ADDRESS          0x23
@@ -362,6 +362,9 @@ short int cold_days = 0;
 short int shade_days = 0;
 short int light_days = 0;
 bool different_day_temp = false;
+float lux_sum = 0;
+int lux_times = 0;
+float lux_average = 0;
 
 
 void sense_and_actuate()
@@ -569,12 +572,18 @@ void handle_high_temperature() {
 // CONTROL LIGHT
 
 void control_light(int currentTime) {
-
+  if(currentTime >= 8 && currentTime <= 19) {
+    lux_sum += sensor_data.lux;
+    lux_times++;
+  }
+  else if(currentTime == 23){
+    lux_average = lux_sum / lux_times;
+    lux_sum = 0;
+    lux_times = 0;
     // Handle low light
-    if (sensor_data.lux < LUX_LOW_THRESHOLD) {
+    if (lux_average < LUX_LOW_THRESHOLD) {
         handle_low_light(currentTime);
     } else {
-      if (currentTime == 23)
         shade_days = 0; // Reset shade days counter 
     }
 
@@ -582,13 +591,13 @@ void control_light(int currentTime) {
     if (sensor_data.lux > LUX_HIGH_THRESHOLD) {
         handle_high_light(currentTime);
     } else {
-      if (currentTime == 23)
         light_days = 0; // Reset light days counter 
     }
+  }
 }
 
 void handle_low_light(int currentTime) {
-    if (shade_days < MAX_NOT_IDEAL_DAYS && currentTime == 23) {
+    if (shade_days < MAX_NOT_IDEAL_DAYS) {
         shade_days++;
     } else {
         DEBUG_PRINTLN("Move the plant to a lighter location.");
@@ -597,7 +606,7 @@ void handle_low_light(int currentTime) {
 }
 
 void handle_high_light(int currentTime) {
-    if (light_days < MAX_NOT_IDEAL_DAYS && currentTime == 23) {
+    if (light_days < MAX_NOT_IDEAL_DAYS) {
         light_days++;
     } else {
         DEBUG_PRINTLN("Move the plant to a location with more shade.");
