@@ -61,7 +61,7 @@
 
 // Sensor thresholds
 #define BATTERY_THRESHOLD       30
-#define MOISTURE_THRESHOLD      20 //Percentage
+#define MOISTURE_THRESHOLD      25 //Percentage
 #define MOISTURE_HIGH_THRESHOLD      70 //Percentage
 #define LUX_LOW_THRESHOLD 6,522.0
 #define LUX_HIGH_THRESHOLD  26,087.0
@@ -130,8 +130,8 @@
 /* WI-FI Connection */
 /*******************************************************************************/
 
-char ssid[] = "PlazaVerde-MyCampusNet-Legacy";        // your network SSID (name)
-char pass[] = "Woolly-Pride-60&";    // your network password (use for WPA, or use as key for WEP)
+char ssid[] = "iPhone de Guille";        // your network SSID (name)
+char pass[] = "12345678";    // your network password (use for WPA, or use as key for WEP)
 
 ArduinoLEDMatrix matrix;
 
@@ -400,11 +400,12 @@ void setup_sensors()
     dht.begin();
     Wire.begin();
     if (!myBH1750.init()) {
-      DEBUG_PRINTLN("BH1750 Connection Failed!");
+      // DEBUG_PRINTLN("BH1750 Connection Failed!");
       // while (1) {}
     }
     pinMode(WATER_LEVEL_PIN,INPUT);
     closeValve(); // Ensure the valve is closed on startup
+    delay(2000);
 }
 
 void measure_sensors()
@@ -536,7 +537,7 @@ void control_temperature(int currentTime) {
 
 void handle_low_temperature() {
     if (sensor_data.temperature < TEMPERATURE_LOW_THRESHOLD) {
-        //light_up_matrix(MATRIX_NEED_WARM_NOW);
+        light_up_matrix(MATRIX_NEED_WARM_NOW);
         DEBUG_PRINTLN("Move the plant to a warmer location now.");
         return;
     }
@@ -545,7 +546,7 @@ void handle_low_temperature() {
         cold_days++;
         different_day_temp = true;
     } else {
-        //light_up_matrix(MATRIX_NEED_WARM);
+        light_up_matrix(MATRIX_NEED_WARM);
         DEBUG_PRINTLN("Move the plant to a warmer location.");
     }
 }
@@ -553,7 +554,7 @@ void handle_low_temperature() {
 void handle_high_temperature() {
     if (sensor_data.temperature > TEMPERATURE_HIGH_THRESHOLD) {
         DEBUG_PRINTLN("Move the plant to a cooler location now.");
-        //light_up_matrix(MATRIX_NEED_COLD_NOW);
+        light_up_matrix(MATRIX_NEED_COLD_NOW);
         return;
     }
 
@@ -562,7 +563,7 @@ void handle_high_temperature() {
         different_day_temp = true;
     } else {
         DEBUG_PRINTLN("Move the plant to a cooler location.");
-        //light_up_matrix(MATRIX_NEED_COLD);
+        light_up_matrix(MATRIX_NEED_COLD);
     }
 }
 
@@ -591,7 +592,7 @@ void handle_low_light(int currentTime) {
     if (shade_days < MAX_NOT_IDEAL_DAYS && currentTime == 23) {
         shade_days++;
     } else {
-        DEBUG_PRINTLN("Move the plant to a lighter location.");
+        //DEBUG_PRINTLN("Move the plant to a lighter location.");
         //light_up_matrix(MATRIX_NEED_SUN);
     }
 }
@@ -600,7 +601,7 @@ void handle_high_light(int currentTime) {
     if (light_days < MAX_NOT_IDEAL_DAYS && currentTime == 23) {
         light_days++;
     } else {
-        DEBUG_PRINTLN("Move the plant to a location with more shade.");
+        //DEBUG_PRINTLN("Move the plant to a location with more shade.");
         //light_up_matrix(MATRIX_NEED_SHADE);
     }
 }
@@ -719,6 +720,7 @@ void setup(){
   matrix.begin();
   // 1. Initialize Serial comm if needed
   DEBUG_PRINT_INIT(9600);
+  
 
   // 2. Connect to WIFI
   connectToWiFi();
