@@ -62,7 +62,7 @@
 // Sensor thresholds
 #define BATTERY_THRESHOLD       30
 #define MOISTURE_THRESHOLD      25 //Percentage
-#define MOISTURE_HIGH_THRESHOLD      50 //Percentage
+#define MOISTURE_HIGH_THRESHOLD      45 //Percentage
 #define LUX_LOW_THRESHOLD 6,522.0
 #define LUX_HIGH_THRESHOLD  26,087.0
 #define TEMPERATURE_LOW_THRESHOLD  10   // THE PLANT NEEDS TO BE MOVED INMEDIATELLY
