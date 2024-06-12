@@ -6,7 +6,6 @@
 </h1>
 
 
-
 ## Motivation
 
 Americans invest billions of dollars annually in houseplants, yet it is estimated that nearly half of these plants die due to improper care, especially from incorrect watering and exposure to light. This trend not only highlights the challenges of plant maintenance but also the economic losses associated with it. Our project aims to tackle this issue by developing a technologically advanced solution that can significantly enhance plant longevity and assist even novice plant owners in ensuring their plants thrive. [More on this issue.](https://www.businessinsider.com/houseplant-industry-americans-billions-die-2022-3)
@@ -53,15 +52,10 @@ Americans invest billions of dollars annually in houseplants, yet it is estimate
 
 ## Responsibilities of Team Members:
 
-- **HW Setup**: Mar, Divya
-- **Embedded SW for Arduino**: Shreyas, William
-- **Research/Algorithm Design**: 
-  - Energy harvesting: William, Shreyas
-  - Networking/Cloud communication: Divya, Mar
-  - Water control system: Shreyas, Divya
-  - User survey: Mar, William
-- **Writing/Report**: Everyone 
-- **Website**: William, Divya
+- **Mar Romiro**: Core algorithm for plant care, User Survey, Experiment Setup and Timelapse
+- **William Rubio**: Hardware assembly, website development, water delivery system, moisture calibration, testbed setup, initial sensor setup
+- **Divya Sanjay**: Energy Profiling, Energy Harvesting System Design, Adaptive Duty Cycling algorithm, Low Power Mode Operation, Website Content, Experiment Setup and Timelapse, System Integration and Testing
+- **Shreyas Shubhankar**: Software for Sensor Calibration, Time Synchronization, WiFi connection, Data Storage, Data Visualization, Energy Profiling, Arduino setup and Loop Software
 
 
 ## Project Timeline
